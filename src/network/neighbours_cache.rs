@@ -65,7 +65,7 @@ impl NeighboursCache {
         self.state.write().get_next_for_ping(start)
     }
 
-    pub fn write(&self) -> RwLockWriteGuard<NeighboursCacheState> {
+    pub fn write(&self) -> RwLockWriteGuard<'_, NeighboursCacheState> {
         self.state.write()
     }
 }

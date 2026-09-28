@@ -93,7 +93,7 @@ impl PersistentStateKeeper {
             .map(|handle| (handle.id().seq_no, handle.meta().brief()))
     }
 
-    pub fn new_state_found(&self) -> tokio::sync::futures::Notified {
+    pub fn new_state_found(&self) -> tokio::sync::futures::Notified<'_> {
         self.persistent_state_changed.notified()
     }
 

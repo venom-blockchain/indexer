@@ -85,9 +85,30 @@ impl ShardStateStorage {
 
         let _gc_lock = self.gc_lock.lock().await;
 
-        let (pending_op, len) = self
-            .cell_storage
-            .store_cell(&mut batch, state.root_cell().clone())?;
+        if handle.meta().has_state() {
+            return Ok(false);
+        }
+
+        let state_key = (block_id.shard_id, block_id.seq_no).to_vec();
+
+        let already_referenced = match self.db.shard_states.get(&state_key)? {
+            None => false,
+            Some(value) => {
+                let stored_root = value.get(..32).context("Invalid stored shard state")?;
+
+                if stored_root != cell_id.as_slice() {
+                    anyhow::bail!("Stored shard state root mismatch");
+                }
+
+                true
+            }
+        };
+        let len = if already_referenced {
+            0
+        } else {
+            self.cell_storage
+                .store_cell(&mut batch, state.root_cell().clone())?
+        };
 
         if block_id.shard_id.is_masterchain() {
             metrics::gauge!("db_shard_state_storage_max_new_mc_cell_count").set(len as f64);
@@ -100,16 +121,9 @@ impl ShardStateStorage {
         value[32..64].copy_from_slice(block_id.root_hash.as_slice());
         value[64..96].copy_from_slice(block_id.file_hash.as_slice());
 
-        batch.put_cf(
-            &self.db.shard_states.cf(),
-            (block_id.shard_id, block_id.seq_no).to_vec(),
-            value,
-        );
+        batch.put_cf(&self.db.shard_states.cf(), state_key, value);
 
         self.db.raw().write(batch)?;
-
-        // Ensure that pending operation guard is dropped after the batch is written
-        drop(pending_op);
 
         Ok(if handle.meta().set_has_state() {
             self.block_handle_storage.store_handle(handle)?;
@@ -227,15 +241,12 @@ impl ShardStateStorage {
             {
                 let _guard = self.gc_lock.lock().await;
 
-                let (pending_op, total) = self
+                let total = self
                     .cell_storage
                     .remove_cell(&mut batch, &alloc, root_hash)?;
                 batch.delete_cf(&shard_states_cf.bound(), key);
 
                 raw.write_opt(batch, cells_write_options)?;
-
-                // Ensure that pending operation guard is dropped after the batch is written
-                drop(pending_op);
 
                 removed_cells += total;
                 tracing::debug!(

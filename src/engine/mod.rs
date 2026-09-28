@@ -391,7 +391,7 @@ impl Engine {
             });
         }
 
-        tasks.try_collect().await?;
+        tasks.try_collect::<()>().await?;
 
         // Done
         tracing::info!(

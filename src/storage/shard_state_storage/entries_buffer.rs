@@ -38,7 +38,7 @@ impl EntriesBuffer {
 pub struct EntriesBufferChildren<'a>(&'a [u32], &'a [[u8; HashesEntry::LEN]]);
 
 impl EntriesBufferChildren<'_> {
-    pub fn iter(&self) -> impl Iterator<Item = (&u32, HashesEntry)> {
+    pub fn iter(&self) -> impl Iterator<Item = (&'_ u32, HashesEntry<'_>)> {
         self.0
             .iter()
             .zip(self.1)
@@ -49,7 +49,7 @@ impl EntriesBufferChildren<'_> {
 pub struct HashesEntryWriter<'a>(&'a mut [u8; HashesEntry::LEN]);
 
 impl HashesEntryWriter<'_> {
-    pub fn as_reader(&self) -> HashesEntry {
+    pub fn as_reader(&self) -> HashesEntry<'_> {
         HashesEntry(self.0)
     }
 
